@@ -128,6 +128,9 @@ typedef struct {
 	int       nextConfettiIndex;
 	int       firstShotLeft;
 	int       firstShotRight;
+
+	int       fallen;
+	int       nextShot;
 } confettistruct;
 
 static confettistruct *confettis = (confettistruct *)NULL;
@@ -235,11 +238,17 @@ init_confetti (ModeInfo * mi)
 	fp->width = MI_WIDTH(mi);
 	fp->height = MI_HEIGHT(mi);
 
+	fp->count = MI_CYCLES(mi);
+	if (fp->count < 100)
+		fp->count = 100;
+
 	fp->speedCounter = SPEED_COUNTER;
 
 	fp->nextConfettiIndex = 0;
 	fp->firstShotLeft = 200;
 	fp->firstShotRight = 200;
+	fp->fallen = fp->count;
+	fp->nextShot = 1;
 
 	char *s = get_string_resource (display, "mode", "Mode");
 
@@ -255,10 +264,6 @@ init_confetti (ModeInfo * mi)
 	fp->mode = kModeCannon;
 
 	MI_CLEARWINDOW(mi);
-
-	fp->count = MI_CYCLES(mi);
-	if (fp->count < 100)
-		fp->count = 100;
 
 	if (fp->confettis == NULL) {
 		if ((fp->confettis = (Confetti *) calloc(fp->count, sizeof (Confetti))) ==
@@ -365,6 +370,7 @@ static void update_confetti (ModeInfo *mi)
 			}
 			if ((fp->confettis[i].offset.y += fp->confettis[i].delta.y) > (fp->height << SHIFT2)) {
 				fp->confettis[i].enabled = 0;
+				fp->fallen++;
 			}
 			fp->confettis[i].offset.x += fp->confettis[i].delta.x;
 
@@ -399,9 +405,13 @@ static void update_confetti (ModeInfo *mi)
 	}
 
 	if (fp->mode == kModeCannon) {
+		if (fp->nextShot > fp->fallen)
+			return;
+
 		for (int i = 0; fp->nextConfettiIndex < fp->count; fp->nextConfettiIndex++, i++) {
 			if (!fp->confettis[fp->nextConfettiIndex].enabled) {
 				fp->confettis[fp->nextConfettiIndex].enabled = 1;
+				fp->fallen--;
 				fp->confettis[fp->nextConfettiIndex].offset.x = 0;
 				fp->confettis[fp->nextConfettiIndex].offset.y = fp->height;
 				fp->confettis[fp->nextConfettiIndex].delta.x =  (((int)(NRAND(11 << 5))) + (2 << 5)) / 5;
@@ -420,8 +430,9 @@ static void update_confetti (ModeInfo *mi)
 		}
 
 		for (int i = 0; fp->nextConfettiIndex < fp->count; fp->nextConfettiIndex++, i++) {
-			if(!fp->confettis[fp->nextConfettiIndex].enabled) {
+			if (!fp->confettis[fp->nextConfettiIndex].enabled) {
 				fp->confettis[fp->nextConfettiIndex].enabled = 1;
+				fp->fallen--;
 				fp->confettis[fp->nextConfettiIndex].offset.x = fp->width;
 				fp->confettis[fp->nextConfettiIndex].offset.y = fp->height;
 				fp->confettis[fp->nextConfettiIndex].delta.x = (-((int)(NRAND(11 << 5))) - (2 << 5)) / 5;
@@ -439,6 +450,11 @@ static void update_confetti (ModeInfo *mi)
 		if (fp->nextConfettiIndex == fp->count) {
 			fp->nextConfettiIndex = 0;
 		}
+
+		fp->nextShot = NRAND(fp->count / 4) + 300;
+
+		fp->firstShotRight = NRAND(fp->nextShot / 2);
+		fp->firstShotLeft = fp->nextShot / 2 - fp->firstShotRight;
 	}
 }
 
