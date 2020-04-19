@@ -36,7 +36,7 @@ static const char sccsid[] = "@(#)confetti.c	5.00 2000/11/01 xlockmore";
 					"*ncolors: 64 \n" \
 					"*fpsSolid: true \n" \
 					"*ignoreRotation: True \n" \
-					"*mode: rain \n" \
+					"*mode: wind \n" \
 
 # define BRIGHT_COLORS
 # define UNIFORM_COLORS
@@ -113,6 +113,8 @@ typedef struct {
 	int		colorIdx;
 
 	int		enabled;
+
+	int     wind;
 } Confetti;
 
 typedef struct {
@@ -174,6 +176,9 @@ static void gen_confetti (ModeInfo * mi)
 		fp->confettis[i].indexFrame = startFrame[i % ARRAYSIZE(startFrame)];
 		fp->confettis[i].colorIdx = i % ARRAYSIZE(cols);
 		fp->confettis[i].enabled = (fp->mode != kModeCannon);
+
+		if (fp->mode == kModeWind)
+			fp->confettis[i].wind = NRAND(10) - 5;
 	}
 }
 
@@ -252,16 +257,14 @@ init_confetti (ModeInfo * mi)
 
 	char *s = get_string_resource (display, "mode", "Mode");
 
-	fp->mode = kModeRain;
+	fp->mode = kModeWind;
 
-	if (!s || !*s || !strcasecmp (s, "rain"))
+	if (!s || !*s || !strcasecmp (s, "wind"))
 		;
 	else if (!strcasecmp (s, "cannon"))
 		fp->mode = kModeCannon;
-	else if (!strcasecmp (s, "wind"))
-		fp->mode = kModeWind;
-
-	fp->mode = kModeCannon;
+	else if (!strcasecmp (s, "rain"))
+		fp->mode = kModeRain;
 
 	MI_CLEARWINDOW(mi);
 
@@ -358,10 +361,19 @@ static void update_confetti (ModeInfo *mi)
 	for (int i = 0; i < fp->count; i++) {
 		switch (fp->mode) {
 		case kModeRain:
-		default:
 			if ((fp->confettis[i].offset.y += fp->confettis[i].delta.y) > (fp->height << SHIFT2)) {
 				fp->confettis[i].offset.y -= fp->height << SHIFT2;
 			}
+			break;
+
+		case kModeWind:
+		default:
+			if ((fp->confettis[i].offset.y += fp->confettis[i].delta.y) > (fp->height << SHIFT2)) {
+				fp->confettis[i].offset.y -= fp->height << SHIFT2;
+
+				fp->confettis[i].wind = NRAND(8) - 4;
+			}
+			fp->confettis[i].offset.x += fp->confettis[i].wind;
 			break;
 
 		case kModeCannon:
