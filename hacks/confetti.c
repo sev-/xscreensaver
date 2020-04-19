@@ -61,11 +61,12 @@ ModStruct   confetti_description =
 #endif
 
 #define MINSTEPS 1
-#define CONFETTI_SIZE 16
+#define CONFETTI_SIZE 12
 #define SHIFT2 2
 #define NUMBER_OF_BOBS 30
 #define NUMBER_OF_BOBFRAMES 60
 #define BOB_SIZE (CONFETTI_SIZE + CONFETTI_SIZE + 1)
+#define SPEED_COUNTER 2
 
 #define ARRAYSIZE(x) ((int)(sizeof(x) / sizeof(x[0])))
 
@@ -106,6 +107,7 @@ typedef struct {
 } Confetti;
 
 typedef struct {
+	int       speedCounter;
 	int       count;
 	int       width, height;
 	Confetti *confettis;
@@ -145,10 +147,10 @@ static void gen_confetti (ModeInfo * mi)
 	fp = &confettis[MI_SCREEN(mi)];
 
 	for (int i = 0; i < fp->count; i++) {
-		fp->confettis[i].offset.x = NRAND(fp->width);
-		fp->confettis[i].offset.y = NRAND(fp->height);
+		fp->confettis[i].offset.x = NRAND(1900);
+		fp->confettis[i].offset.y = NRAND(1000)-1100;
 		fp->confettis[i].delta.x = 0;
-		fp->confettis[i].delta.y = deltaY[i % ARRAYSIZE(deltaY)];
+		fp->confettis[i].delta.y = deltaY[i % ARRAYSIZE(deltaY)] / 12;
 		fp->confettis[i].deltaBob = deltaBob[i % ARRAYSIZE(deltaBob)];
 		fp->confettis[i].deltaFrame = deltaFrame[i % ARRAYSIZE(deltaFrame)];
 		fp->confettis[i].indexBob = startBob[i % ARRAYSIZE(startBob)];
@@ -217,6 +219,8 @@ init_confetti (ModeInfo * mi)
 
 	fp->width = MI_WIDTH(mi);
 	fp->height = MI_HEIGHT(mi);
+
+	fp->speedCounter = SPEED_COUNTER;
 
 	MI_CLEARWINDOW(mi);
 
@@ -309,26 +313,14 @@ init_confetti (ModeInfo * mi)
 	gen_confetti(mi);
 }
 
-ENTRYPOINT void
-draw_confetti (ModeInfo * mi)
+static void update_confetti (ModeInfo *mi)
 {
-	Display    *display = MI_DISPLAY(mi);
-	Window      window = MI_WINDOW(mi);
-	GC          gc = MI_GC(mi);
 	confettistruct *fp;
 
 	if (confettis == NULL)
 		return;
 	fp = &confettis[MI_SCREEN(mi)];
 
-	MI_IS_DRAWN(mi) = True;
-	XSetForeground(display, gc, MI_BLACK_PIXEL(mi));
-
-	for (int i = 0; i < fp->count; i++) {
-		XFillRectangle(display, window, gc, fp->confettis[i].offset.x, fp->confettis[i].offset.y, BOB_SIZE, BOB_SIZE);
-	}
-
-	// Update positions
 	for (int i = 0; i < fp->count; i++) {
 		if ((fp->confettis[i].offset.y += fp->confettis[i].delta.y) > (fp->height << SHIFT2)) {
 			fp->confettis[i].offset.y -= fp->height << SHIFT2;
@@ -345,6 +337,38 @@ draw_confetti (ModeInfo * mi)
 		if (fp->confettis[i].indexFrame >= NUMBER_OF_BOBFRAMES << SHIFT2) {
 			fp->confettis[i].indexFrame -= NUMBER_OF_BOBFRAMES << SHIFT2;
 		}
+	}
+}
+
+ENTRYPOINT void
+draw_confetti (ModeInfo * mi)
+{
+	Display    *display = MI_DISPLAY(mi);
+	Window      window = MI_WINDOW(mi);
+	GC          gc = MI_GC(mi);
+	confettistruct *fp;
+
+	if (confettis == NULL)
+		return;
+	fp = &confettis[MI_SCREEN(mi)];
+
+	fp->speedCounter--;
+
+	if (fp->speedCounter)
+		return;
+
+	fp->speedCounter = SPEED_COUNTER;
+
+	MI_IS_DRAWN(mi) = True;
+	XSetForeground(display, gc, MI_BLACK_PIXEL(mi));
+
+	for (int i = 0; i < fp->count; i++) {
+		XFillRectangle(display, window, gc, fp->confettis[i].offset.x, fp->confettis[i].offset.y, BOB_SIZE, BOB_SIZE);
+	}
+
+	update_confetti(mi);
+
+	for (int i = 0; i < fp->count; i++) {
 
 		int idx = fp->confettis[i].indexBob >> SHIFT2;
 		int render_posX = fp->confettis[i].offset.x;
