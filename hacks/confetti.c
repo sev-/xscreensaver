@@ -36,6 +36,7 @@ static const char sccsid[] = "@(#)confetti.c	5.00 2000/11/01 xlockmore";
 					"*ncolors: 64 \n" \
 					"*fpsSolid: true \n" \
 					"*ignoreRotation: True \n" \
+					"*mode: rain \n" \
 
 # define BRIGHT_COLORS
 # define UNIFORM_COLORS
@@ -76,6 +77,12 @@ static const int deltaFrame[] = {17,8,19,5,7,13};
 static const int startBob[] = {0,2,4,6,8,10,12,14,16,18,20,22,24,26,28};
 static const int startFrame[] = {3,6,9,12,15,18,21,24,27,30,33,36,39,42,45,48,51,54,57};
 
+enum Mode {
+	kModeRain,
+	kModeCannon,
+	kModeWind
+};
+
 static const int cols[] = {
 		0x330000,
 		0x003300,
@@ -104,16 +111,23 @@ typedef struct {
 	int		indexBob;
 	int		indexFrame;
 	int		colorIdx;
+
+	int		enabled;
 } Confetti;
 
 typedef struct {
+	int       mode;
 	int       speedCounter;
 	int       count;
 	int       width, height;
 	Confetti *confettis;
 	int      *bobs[NUMBER_OF_BOBS][NUMBER_OF_BOBFRAMES];
 
-	int *colors[ARRAYSIZE(cols)];
+	int      *colors[ARRAYSIZE(cols)];
+
+	int       nextConfettiIndex;
+	int       firstShotLeft;
+	int       firstShotRight;
 } confettistruct;
 
 static confettistruct *confettis = (confettistruct *)NULL;
@@ -156,6 +170,7 @@ static void gen_confetti (ModeInfo * mi)
 		fp->confettis[i].indexBob = startBob[i % ARRAYSIZE(startBob)];
 		fp->confettis[i].indexFrame = startFrame[i % ARRAYSIZE(startFrame)];
 		fp->confettis[i].colorIdx = i % ARRAYSIZE(cols);
+		fp->confettis[i].enabled = (fp->mode != kModeCannon);
 	}
 }
 
@@ -222,6 +237,23 @@ init_confetti (ModeInfo * mi)
 
 	fp->speedCounter = SPEED_COUNTER;
 
+	fp->nextConfettiIndex = 0;
+	fp->firstShotLeft = 200;
+	fp->firstShotRight = 200;
+
+	char *s = get_string_resource (display, "mode", "Mode");
+
+	fp->mode = kModeRain;
+
+	if (!s || !*s || !strcasecmp (s, "rain"))
+		;
+	else if (!strcasecmp (s, "cannon"))
+		fp->mode = kModeCannon;
+	else if (!strcasecmp (s, "wind"))
+		fp->mode = kModeWind;
+
+	fp->mode = kModeCannon;
+
 	MI_CLEARWINDOW(mi);
 
 	fp->count = MI_CYCLES(mi);
@@ -255,9 +287,6 @@ init_confetti (ModeInfo * mi)
 			fp->colors[i][step1 + j] = faderConfetti[j];
 		}
 	}
-
-	XWindowAttributes    hack_attributes;
-	XGetWindowAttributes (display, MI_WINDOW(mi), &hack_attributes);
 
 	for (int i = 0; i < NUMBER_OF_BOBFRAMES; i++) {
 		int r2a = i + i + i;
@@ -322,8 +351,38 @@ static void update_confetti (ModeInfo *mi)
 	fp = &confettis[MI_SCREEN(mi)];
 
 	for (int i = 0; i < fp->count; i++) {
-		if ((fp->confettis[i].offset.y += fp->confettis[i].delta.y) > (fp->height << SHIFT2)) {
-			fp->confettis[i].offset.y -= fp->height << SHIFT2;
+		switch (fp->mode) {
+		case kModeRain:
+		default:
+			if ((fp->confettis[i].offset.y += fp->confettis[i].delta.y) > (fp->height << SHIFT2)) {
+				fp->confettis[i].offset.y -= fp->height << SHIFT2;
+			}
+			break;
+
+		case kModeCannon:
+			if (!fp->confettis[i].enabled) {
+				continue;
+			}
+			if ((fp->confettis[i].offset.y += fp->confettis[i].delta.y) > (fp->height << SHIFT2)) {
+				fp->confettis[i].enabled = 0;
+			}
+			fp->confettis[i].offset.x += fp->confettis[i].delta.x;
+
+			if (fp->confettis[i].delta.y < (3 << SHIFT2)) {
+				fp->confettis[i].delta.y += 2;
+			}
+
+			if (fp->confettis[i].delta.x > 0) {
+				if (fp->confettis[i].delta.x > (1 << (SHIFT2 - 1))) {
+					fp->confettis[i].delta.x -= 2;
+				}
+			} else {
+				if (fp->confettis[i].delta.x < (-1 << (SHIFT2 - 1))) {
+					fp->confettis[i].delta.x += 2;
+				}
+			}
+
+			break;
 		}
 
 		fp->confettis[i].indexBob += fp->confettis[i].deltaBob;
@@ -336,6 +395,49 @@ static void update_confetti (ModeInfo *mi)
 
 		if (fp->confettis[i].indexFrame >= NUMBER_OF_BOBFRAMES << SHIFT2) {
 			fp->confettis[i].indexFrame -= NUMBER_OF_BOBFRAMES << SHIFT2;
+		}
+	}
+
+	if (fp->mode == kModeCannon) {
+		for (int i = 0; fp->nextConfettiIndex < fp->count; fp->nextConfettiIndex++, i++) {
+			if (!fp->confettis[fp->nextConfettiIndex].enabled) {
+				fp->confettis[fp->nextConfettiIndex].enabled = 1;
+				fp->confettis[fp->nextConfettiIndex].offset.x = 0;
+				fp->confettis[fp->nextConfettiIndex].offset.y = fp->height;
+				fp->confettis[fp->nextConfettiIndex].delta.x =  (((int)(NRAND(11 << 5))) + (2 << 5)) / 5;
+				fp->confettis[fp->nextConfettiIndex].delta.y = (-((int)(NRAND( 8 << 5))) - (4 << 5)) / 5;
+				if (fp->firstShotLeft == 0) {
+					if (i > 1) {
+						break;
+					}
+				} else {
+					fp->firstShotLeft--;
+				}
+			}
+		}
+		if (fp->nextConfettiIndex == fp->count) {
+			fp->nextConfettiIndex = 0;
+		}
+
+		for (int i = 0; fp->nextConfettiIndex < fp->count; fp->nextConfettiIndex++, i++) {
+			if(!fp->confettis[fp->nextConfettiIndex].enabled) {
+				fp->confettis[fp->nextConfettiIndex].enabled = 1;
+				fp->confettis[fp->nextConfettiIndex].offset.x = fp->width;
+				fp->confettis[fp->nextConfettiIndex].offset.y = fp->height;
+				fp->confettis[fp->nextConfettiIndex].delta.x = (-((int)(NRAND(11 << 5))) - (2 << 5)) / 5;
+				fp->confettis[fp->nextConfettiIndex].delta.y = (-((int)(NRAND( 8 << 5))) - (4 << 5)) / 5;
+
+				if (fp->firstShotRight == 0) {
+					if (i > 1) {
+						break;
+					}
+				} else {
+					fp->firstShotRight--;
+				}
+			}
+		}
+		if (fp->nextConfettiIndex == fp->count) {
+			fp->nextConfettiIndex = 0;
 		}
 	}
 }
