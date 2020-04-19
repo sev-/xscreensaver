@@ -62,7 +62,10 @@ ModStruct   confetti_description =
 
 #define MINSTEPS 1
 #define CONFETTI_SIZE 16
-#define SHIFT2 5
+#define SHIFT2 2
+#define NUMBER_OF_BOBS 30
+#define NUMBER_OF_BOBFRAMES 60
+#define BOB_SIZE (CONFETTI_SIZE + CONFETTI_SIZE + 1)
 
 typedef struct {
 	XPoint	offset, delta;
@@ -78,6 +81,7 @@ typedef struct {
 	int         count;
 	int         width, height;
 	Confetti   *confettis;
+	Pixmap      bobs[NUMBER_OF_BOBS][NUMBER_OF_BOBFRAMES];
 } confettistruct;
 
 
@@ -142,9 +146,34 @@ static void gen_confetti (ModeInfo * mi)
 	}
 }
 
+#define DEG2RAD (M_PI / 180.0)
+#define RAD2DEG (180.0 / M_PI)
+
+static int calcXint(double radius, double alpha)
+{
+	return (int)(radius * cos(alpha * DEG2RAD) + 0.5);
+}
+
+static int calcYint(double radius, double alpha)
+{
+	return (int)(radius * sin(alpha * DEG2RAD) + 0.5);
+}
+
+static double calcAlpha(double x, double y)
+{
+	return atan(y / x) * RAD2DEG;
+}
+
+static double calcRadius(int x, int y)
+{
+	return sqrt(x * x + y * y);
+}
+
+
 ENTRYPOINT void
 init_confetti (ModeInfo * mi)
 {
+	Display *display = MI_DISPLAY(mi);
 	confettistruct *fp;
 
 	MI_INIT (mi, confettis);
@@ -166,6 +195,74 @@ init_confetti (ModeInfo * mi)
 			return;
 		}
 	}
+
+	int faderColors[31];
+
+	XWindowAttributes    hack_attributes;
+	XGetWindowAttributes (display, MI_WINDOW(mi), &hack_attributes);
+
+	int *bob0color[NUMBER_OF_BOBFRAMES];
+
+	for (int i = 0; i < NUMBER_OF_BOBFRAMES; i++) {
+		int r2a = i + i + i;
+		int radius2 = calcXint(CONFETTI_SIZE, r2a);
+		int colorindex = i >= NUMBER_OF_BOBFRAMES / 2 ? NUMBER_OF_BOBFRAMES - i : i;
+
+		fp->bobs[0][i] = XCreatePixmap(MI_DISPLAY(mi), MI_WINDOW(mi), BOB_SIZE, BOB_SIZE, hack_attributes.depth);
+		bob0color[i] = (int *)calloc(BOB_SIZE * BOB_SIZE, sizeof(int));
+
+		for (int a = 90; a < 180 + 90; a++) {
+			int x1 = calcXint(radius2, a);
+			int y1 = calcYint(CONFETTI_SIZE, a);
+
+			double r1 = calcRadius(x1, y1);
+			double a1 = calcAlpha(x1, y1);
+			x1 = calcXint(r1, a1);
+			y1 = calcYint(r1, a1);
+
+			XSetForeground(display, MI_GC(mi), faderColors[colorindex]);
+			XDrawLine(display, fp->bobs[0][i], MI_GC(mi), -x1 + CONFETTI_SIZE, y1 + CONFETTI_SIZE, x1 + CONFETTI_SIZE, y1 + CONFETTI_SIZE);
+
+			for (int x = -x1; x <= x1; x++) {
+				int xx = x + CONFETTI_SIZE;
+				int yy = (y1 + CONFETTI_SIZE) * BOB_SIZE;
+
+				bob0color[i][xx+yy] = faderColors[colorindex];
+			}
+		}
+	}
+
+	double angle = 0;
+	for (int b = 1; b < NUMBER_OF_BOBS; b++) {
+		angle += (180 / NUMBER_OF_BOBS);
+		for (int f = 0; f < NUMBER_OF_BOBFRAMES; f++) {
+			fp->bobs[b][f] = XCreatePixmap(MI_DISPLAY(mi), MI_WINDOW(mi), BOB_SIZE, BOB_SIZE, hack_attributes.depth);
+
+			for (double y = -CONFETTI_SIZE; y <= CONFETTI_SIZE; y += 0.7) {
+				for (double x =- CONFETTI_SIZE; x <= CONFETTI_SIZE; x += 0.7) {
+					double r = calcRadius(x, y);
+					double a = calcAlpha(x, y) + angle;
+					if (x < 0) {
+						a += 180;
+					}
+					int x1 = CONFETTI_SIZE + calcXint(r, a);
+					int y1 = CONFETTI_SIZE + calcYint(r, a);
+					int x2 = (int)(x + 0.5) + CONFETTI_SIZE;
+					int y2 = (int)(y + 0.5) + CONFETTI_SIZE;
+
+					if (x1 >= 0 && x1 < BOB_SIZE && y1 >= 0 && y1 < BOB_SIZE) {
+						XSetForeground(display, MI_GC(mi), bob0color[f][x2 + y2 * BOB_SIZE]);
+						XDrawPoint(display, fp->bobs[b][f], MI_GC(mi), x1, y1);
+					}
+				}
+			}
+		}
+	}
+
+	for (int i = 0; i < NUMBER_OF_BOBFRAMES; i++) {
+		free(bob0color[i]);
+	}
+
 	gen_confetti(mi);
 }
 
