@@ -584,7 +584,8 @@ XScreenSaver.bourneShell:		/bin/sh
 @GL_KLUDGE@ GL: 				etruscanvenus -root			    \n\
 @GL_KLUDGE@ GL: 				gibson -root				    \n\
 @GL_KLUDGE@ GL: 				headroom -root				    \n\
-@GL_KLUDGE@ GL: 				sphereeversion -root			    \n
+@GL_KLUDGE@ GL: 				sphereeversion -root			    \n\
+				confetti -root					\n
 
 
 
@@ -610,6 +611,7 @@ XScreenSaver.bourneShell:		/bin/sh
 *hacks.cloudlife.name:      CloudLife
 *hacks.companioncube.name:  CompanionCube
 *hacks.covid19.name:        COVID19
+*hacks.confetti.name:       Confetti
 *hacks.cubestack.name:      CubeStack
 *hacks.cubestorm.name:      CubeStorm
 *hacks.cubetwist.name:      CubeTwist

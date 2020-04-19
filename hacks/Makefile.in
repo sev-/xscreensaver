@@ -100,7 +100,7 @@ SRCS		= attraction.c blitspin.c bouboule.c braid.c bubbles.c \
 		  maze.c moire.c noseguy.c pedal.c penrose.c pyro.c qix.c \
 		  rocks.c rorschach.c screenhack.c sierpinski.c slidescreen.c \
 		  slip.c sphere.c spiral.c strange.c swirl.c xlockmore.c \
-		  fps.c goop.c starfish.c munch.c fadeplot.c \
+		  fps.c goop.c starfish.c munch.c fadeplot.c confetti.c \
 		  rd-bomb.c coral.c mountain.c triangle.c lissie.c worm.c \
 		  rotor.c ant.c xjack.c xlyap.c xscreensaver-sgigl.c \
 		  cynosure.c moire2.c flow.c epicycle.c interference.c \
@@ -141,7 +141,7 @@ OBJS		= attraction.o blitspin.o bouboule.o braid.o bubbles.o \
 		  maze.o moire.o noseguy.o pedal.o penrose.o pyro.o qix.o \
 		  rocks.o rorschach.o screenhack.o sierpinski.o slidescreen.o \
 		  slip.o sphere.o spiral.o strange.o swirl.o xlockmore.o \
-		  fps.o goop.o starfish.o munch.o fadeplot.o \
+		  fps.o goop.o starfish.o munch.o fadeplot.o confetti.o \
 		  rd-bomb.o coral.o mountain.o triangle.o lissie.o worm.o \
 		  rotor.o ant.o xjack.o xlyap.o xscreensaver-sgigl.o \
 		  cynosure.o moire2.o flow.o epicycle.o interference.o \
@@ -172,7 +172,7 @@ EXES		= attraction blitspin bouboule braid decayscreen deco \
 		  maze moire noseguy pedal \
 		  penrose pyro qix rocks rorschach sierpinski slidescreen \
 		  slip strange swirl goop starfish munch \
-		  fadeplot rd-bomb coral mountain triangle \
+		  fadeplot confetti rd-bomb coral mountain triangle \
 		  xjack xlyap cynosure moire2 flow epicycle \
 		  interference truchet bsod crystal discrete distort kumppa \
 		  demon loop penetrate deluxe compass squiral xflame \
@@ -218,7 +218,7 @@ MEN		= anemone.man apollonian.man attraction.man \
 	          bumps.man ccurve.man compass.man coral.man \
 	          crystal.man cynosure.man decayscreen.man \
 	          deco.man deluxe.man demon.man discrete.man distort.man \
-	          drift.man epicycle.man euler2d.man fadeplot.man \
+	          drift.man epicycle.man euler2d.man fadeplot.man confetti.man \
 	          flame.man flow.man fluidballs.man galaxy.man \
 	          goop.man grav.man greynetic.man halo.man helix.man \
 	          hopalong.man ifs.man imsmap.man \
@@ -777,7 +777,7 @@ xspirograph:	xspirograph.o	$(HACK_OBJS) $(COL) $(ERASE)
 nerverot:	nerverot.o	$(HACK_OBJS) $(COL)
 	$(CC_HACK) -o $@ $@.o	$(HACK_OBJS) $(COL) $(HACK_LIBS)
 
-xrayswarm:	xrayswarm.o	$(HACK_OBJS) 
+xrayswarm:	xrayswarm.o	$(HACK_OBJS)
 	$(CC_HACK) -o $@ $@.o	$(HACK_OBJS) $(HACK_LIBS)
 
 hyperball:	hyperball.o	$(HACK_OBJS)
@@ -978,6 +978,9 @@ swirl:		swirl.o		$(XLOCK_OBJS) $(SHM)
 	$(CC_HACK) -o $@ $@.o	$(XLOCK_OBJS) $(SHM) $(HACK_LIBS) $(THRL)
 
 fadeplot:	fadeplot.o	$(XLOCK_OBJS)
+	$(CC_HACK) -o $@ $@.o	$(XLOCK_OBJS) $(HACK_LIBS)
+
+confetti:	confetti.o	$(XLOCK_OBJS)
 	$(CC_HACK) -o $@ $@.o	$(XLOCK_OBJS) $(HACK_LIBS)
 
 mountain:	mountain.o	$(XLOCK_OBJS)
@@ -1463,6 +1466,21 @@ compass.o: $(UTILS_SRC)/usleep.h
 compass.o: $(UTILS_SRC)/visual.h
 compass.o: $(UTILS_SRC)/xdbe.h
 compass.o: $(UTILS_SRC)/yarandom.h
+confetti.o: ../config.h
+confetti.o: $(srcdir)/fps.h
+confetti.o: $(srcdir)/recanim.h
+confetti.o: $(srcdir)/screenhackI.h
+confetti.o: $(UTILS_SRC)/colors.h
+confetti.o: $(UTILS_SRC)/erase.h
+confetti.o: $(UTILS_SRC)/font-retry.h
+confetti.o: $(UTILS_SRC)/grabscreen.h
+confetti.o: $(UTILS_SRC)/hsv.h
+confetti.o: $(UTILS_SRC)/resources.h
+confetti.o: $(UTILS_SRC)/usleep.h
+confetti.o: $(UTILS_SRC)/visual.h
+confetti.o: $(UTILS_SRC)/yarandom.h
+confetti.o: $(srcdir)/xlockmoreI.h
+confetti.o: $(srcdir)/xlockmore.h
 coral.o: ../config.h
 coral.o: $(srcdir)/fps.h
 coral.o: $(srcdir)/recanim.h
@@ -3317,4 +3335,3 @@ zoom.o: $(UTILS_SRC)/resources.h
 zoom.o: $(UTILS_SRC)/usleep.h
 zoom.o: $(UTILS_SRC)/visual.h
 zoom.o: $(UTILS_SRC)/yarandom.h
-

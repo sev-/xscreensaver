@@ -166,7 +166,7 @@
 				compass -root				    \\n\
 				deluxe -root				    \\n\
 -				demon -root				    \\n\
-  GL: 				extrusion -root				    \\n\
+- GL: 				extrusion -root				    \\n\
 -				loop -root				    \\n\
 				penetrate -root				    \\n\
 				petri -root				    \\n\
@@ -334,6 +334,7 @@
   GL: 				gibson -root				    \\n\
   GL: 				headroom -root				    \\n\
   GL: 				sphereeversion -root			    \\n",
+  				confetti -root					\\n",
 "*hacks.antinspect.name:     AntInspect",
 "*hacks.antmaze.name:        AntMaze",
 "*hacks.antspotlight.name:   AntSpotlight",
@@ -349,6 +350,7 @@
 "*hacks.cloudlife.name:      CloudLife",
 "*hacks.companioncube.name:  CompanionCube",
 "*hacks.covid19.name:        COVID19",
+"*hacks.confetti.name:       Confetti",
 "*hacks.cubestack.name:      CubeStack",
 "*hacks.cubestorm.name:      CubeStorm",
 "*hacks.cubetwist.name:      CubeTwist",
