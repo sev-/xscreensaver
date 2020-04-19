@@ -67,36 +67,6 @@ ModStruct   confetti_description =
 #define NUMBER_OF_BOBFRAMES 60
 #define BOB_SIZE (CONFETTI_SIZE + CONFETTI_SIZE + 1)
 
-typedef struct {
-	XPoint	offset, delta;
-
-	int		deltaBob;
-	int		deltaFrame;
-	int		indexBob;
-	int		indexFrame;
-	int		colors;
-} Confetti;
-
-typedef struct {
-	int         count;
-	int         width, height;
-	Confetti   *confettis;
-	Pixmap      bobs[NUMBER_OF_BOBS][NUMBER_OF_BOBFRAMES];
-} confettistruct;
-
-
-static confettistruct *confettis = (confettistruct *)NULL;
-
-ENTRYPOINT void
-free_confetti(ModeInfo * mi)
-{
-	confettistruct *fp = &confettis[MI_SCREEN(mi)];
-	if (fp->confettis != NULL) {
-		(void) free((void *) fp->confettis);
-		fp->confettis = (Confetti *) NULL;
-	}
-}
-
 #define ARRAYSIZE(x) ((int)(sizeof(x) / sizeof(x[0])))
 
 static const int deltaY[] = {48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128};
@@ -125,6 +95,47 @@ static const int cols2[] = {
 		0xffffff
 };
 
+typedef struct {
+	XPoint	offset, delta;
+
+	int		deltaBob;
+	int		deltaFrame;
+	int		indexBob;
+	int		indexFrame;
+	int		colorIdx;
+} Confetti;
+
+typedef struct {
+	int       count;
+	int       width, height;
+	Confetti *confettis;
+	int      *bobs[NUMBER_OF_BOBS][NUMBER_OF_BOBFRAMES];
+
+	int *colors[ARRAYSIZE(cols)];
+} confettistruct;
+
+static confettistruct *confettis = (confettistruct *)NULL;
+
+ENTRYPOINT void
+free_confetti(ModeInfo * mi)
+{
+	confettistruct *fp = &confettis[MI_SCREEN(mi)];
+	if (fp->confettis != NULL) {
+		(void) free((void *) fp->confettis);
+		fp->confettis = (Confetti *) NULL;
+	}
+
+	for (int b = 0; b < NUMBER_OF_BOBS; b++) {
+		for (int f = 0; f < NUMBER_OF_BOBFRAMES; f++) {
+			free(fp->bobs[b][f]);
+		}
+	}
+
+	for (int i = 0; i < ARRAYSIZE(cols); i++) {
+		free(fp->colors[i]);
+	}
+}
+
 static void gen_confetti (ModeInfo * mi)
 {
 	confettistruct *fp;
@@ -142,7 +153,7 @@ static void gen_confetti (ModeInfo * mi)
 		fp->confettis[i].deltaFrame = deltaFrame[i % ARRAYSIZE(deltaFrame)];
 		fp->confettis[i].indexBob = startBob[i % ARRAYSIZE(startBob)];
 		fp->confettis[i].indexFrame = startFrame[i % ARRAYSIZE(startFrame)];
-		fp->confettis[i].colors = cols[i % ARRAYSIZE(cols)];
+		fp->confettis[i].colorIdx = i % ARRAYSIZE(cols);
 	}
 }
 
@@ -167,6 +178,31 @@ static double calcAlpha(double x, double y)
 static double calcRadius(int x, int y)
 {
 	return sqrt(x * x + y * y);
+}
+
+static int *genFade(int color1, int color2, int size) {
+	int *pal = (int *)calloc(size, sizeof(int));
+
+	double red1   = (color1 >> 16) & 0xff;
+	double green1 = (color1 >>  8) & 0xff;
+	double blue1  =  color1        & 0xff;
+
+	double red2   = (color2 >> 16) & 0xff;
+	double green2 = (color2 >>  8) & 0xff;
+	double blue2  =  color2        & 0xff;
+
+	double redDelta   = (red2   - red1)   / (size - 1);
+	double greenDelta = (green2 - green1) / (size - 1);
+	double blueDelta  = (blue2  - blue1)  / (size - 1);
+
+	for (int i = 0; i < size; i++) {
+		pal[i] = (((int)(red1 + 0.5)) << 16) + (((int)(green1 + 0.5)) << 8) + (int)(blue1 + 0.5);
+		red1   += redDelta;
+		green1 += greenDelta;
+		blue1  += blueDelta;
+	}
+
+	return pal;
 }
 
 
@@ -196,20 +232,35 @@ init_confetti (ModeInfo * mi)
 		}
 	}
 
-	int faderColors[31];
+	int *faderColors = genFade(0x0000ff, 0x000000, 31);
+
+	int step1 = 230;
+	int step2 = 256 - step1;
+
+	for (int i = 0; i < ARRAYSIZE(cols); i++) {
+		fp->colors[i] = (int *)calloc(256, sizeof(int));
+
+		int *faderConfetti = genFade(0x000000, cols[i], step1);
+		for (int j = 0; j < step1; j++) {
+			fp->colors[i][j] = faderConfetti[j];
+		}
+		free(faderConfetti);
+
+		faderConfetti = genFade(cols[i],cols2[i],step2);
+		for (int j = 0; j < step2; j++) {
+			fp->colors[i][step1 + j] = faderConfetti[j];
+		}
+	}
 
 	XWindowAttributes    hack_attributes;
 	XGetWindowAttributes (display, MI_WINDOW(mi), &hack_attributes);
-
-	int *bob0color[NUMBER_OF_BOBFRAMES];
 
 	for (int i = 0; i < NUMBER_OF_BOBFRAMES; i++) {
 		int r2a = i + i + i;
 		int radius2 = calcXint(CONFETTI_SIZE, r2a);
 		int colorindex = i >= NUMBER_OF_BOBFRAMES / 2 ? NUMBER_OF_BOBFRAMES - i : i;
 
-		fp->bobs[0][i] = XCreatePixmap(MI_DISPLAY(mi), MI_WINDOW(mi), BOB_SIZE, BOB_SIZE, hack_attributes.depth);
-		bob0color[i] = (int *)calloc(BOB_SIZE * BOB_SIZE, sizeof(int));
+		fp->bobs[0][i] = (int *)calloc(BOB_SIZE * BOB_SIZE, sizeof(int));
 
 		for (int a = 90; a < 180 + 90; a++) {
 			int x1 = calcXint(radius2, a);
@@ -220,14 +271,11 @@ init_confetti (ModeInfo * mi)
 			x1 = calcXint(r1, a1);
 			y1 = calcYint(r1, a1);
 
-			XSetForeground(display, MI_GC(mi), faderColors[colorindex]);
-			XDrawLine(display, fp->bobs[0][i], MI_GC(mi), -x1 + CONFETTI_SIZE, y1 + CONFETTI_SIZE, x1 + CONFETTI_SIZE, y1 + CONFETTI_SIZE);
-
 			for (int x = -x1; x <= x1; x++) {
 				int xx = x + CONFETTI_SIZE;
 				int yy = (y1 + CONFETTI_SIZE) * BOB_SIZE;
 
-				bob0color[i][xx+yy] = faderColors[colorindex];
+				fp->bobs[0][i][xx + yy] = faderColors[colorindex];
 			}
 		}
 	}
@@ -236,7 +284,7 @@ init_confetti (ModeInfo * mi)
 	for (int b = 1; b < NUMBER_OF_BOBS; b++) {
 		angle += (180 / NUMBER_OF_BOBS);
 		for (int f = 0; f < NUMBER_OF_BOBFRAMES; f++) {
-			fp->bobs[b][f] = XCreatePixmap(MI_DISPLAY(mi), MI_WINDOW(mi), BOB_SIZE, BOB_SIZE, hack_attributes.depth);
+			fp->bobs[b][f] = (int *)calloc(BOB_SIZE * BOB_SIZE, sizeof(int));
 
 			for (double y = -CONFETTI_SIZE; y <= CONFETTI_SIZE; y += 0.7) {
 				for (double x =- CONFETTI_SIZE; x <= CONFETTI_SIZE; x += 0.7) {
@@ -251,16 +299,11 @@ init_confetti (ModeInfo * mi)
 					int y2 = (int)(y + 0.5) + CONFETTI_SIZE;
 
 					if (x1 >= 0 && x1 < BOB_SIZE && y1 >= 0 && y1 < BOB_SIZE) {
-						XSetForeground(display, MI_GC(mi), bob0color[f][x2 + y2 * BOB_SIZE]);
-						XDrawPoint(display, fp->bobs[b][f], MI_GC(mi), x1, y1);
+						fp->bobs[b][f][x1 + y1 * BOB_SIZE] = fp->bobs[0][f][x2 + y2 * BOB_SIZE];
 					}
 				}
 			}
 		}
-	}
-
-	for (int i = 0; i < NUMBER_OF_BOBFRAMES; i++) {
-		free(bob0color[i]);
 	}
 
 	gen_confetti(mi);
@@ -282,11 +325,7 @@ draw_confetti (ModeInfo * mi)
 	XSetForeground(display, gc, MI_BLACK_PIXEL(mi));
 
 	for (int i = 0; i < fp->count; i++) {
-		XFillArc (display, window, gc,
-				fp->confettis[i].offset.x,
-				fp->confettis[i].offset.y,
-				CONFETTI_SIZE, CONFETTI_SIZE,
-				0, 360*64);
+		XFillRectangle(display, window, gc, fp->confettis[i].offset.x, fp->confettis[i].offset.y, BOB_SIZE, BOB_SIZE);
 	}
 
 	// Update positions
@@ -295,26 +334,47 @@ draw_confetti (ModeInfo * mi)
 			fp->confettis[i].offset.y -= fp->height << SHIFT2;
 		}
 
-#if 0
-		indexBob += deltaBob;
+		fp->confettis[i].indexBob += fp->confettis[i].deltaBob;
 
-		if (indexBob >= PartConfetti.NUMBER_OF_BOBS << SHIFT2) {
-			indexBob -= PartConfetti.NUMBER_OF_BOBS << SHIFT2;
+		if (fp->confettis[i].indexBob >= NUMBER_OF_BOBS << SHIFT2) {
+			fp->confettis[i].indexBob -= NUMBER_OF_BOBS << SHIFT2;
 		}
 
-		indexFrame += deltaFrame;
+		fp->confettis[i].indexFrame += fp->confettis[i].deltaFrame;
 
-		if (indexFrame >= PartConfetti.NUMBER_OF_BOBFRAMES << SHIFT2) {
-			indexFrame -= PartConfetti.NUMBER_OF_BOBFRAMES << SHIFT2;
+		if (fp->confettis[i].indexFrame >= NUMBER_OF_BOBFRAMES << SHIFT2) {
+			fp->confettis[i].indexFrame -= NUMBER_OF_BOBFRAMES << SHIFT2;
 		}
-#endif
-		XSetForeground(display, gc, fp->confettis[i].colors);
 
-		XFillArc (display, window, gc,
-				fp->confettis[i].offset.x,
-				fp->confettis[i].offset.y,
-				CONFETTI_SIZE, CONFETTI_SIZE,
-				0, 360*64);
+		int idx = fp->confettis[i].indexBob >> SHIFT2;
+		int render_posX = fp->confettis[i].offset.x;
+		int render_posY = fp->confettis[i].offset.y;
+
+		int clipX2 = fp->width;
+		int clipY2 = fp->height;
+
+		int startX = render_posX <0 ? -render_posX : 0;
+		int endX   = render_posX + BOB_SIZE > clipX2 ? clipX2 - render_posX :  BOB_SIZE;
+		int startY = render_posY < 0 ? -render_posY : 0;
+		int endY   = render_posY + BOB_SIZE > clipY2 ? clipY2 - render_posY + render_posY : BOB_SIZE + render_posY;
+
+		int render_offsetBob = startY * BOB_SIZE;
+		startY += render_posY;
+		int offset = startY*clipX2+render_posX;
+		int pixel;
+
+		int *colors = fp->colors[fp->confettis[i].colorIdx];
+		int bobIdx = fp->confettis[i].indexFrame >> SHIFT2;
+
+		for (int y = startY; y < endY; y++, render_offsetBob += BOB_SIZE, offset += clipX2) {
+			for (int x = startX; x < endX; x++) {
+				pixel = fp->bobs[idx][bobIdx][render_offsetBob + x];
+				if (pixel != 0) {
+					XSetForeground(display, gc, colors[pixel]);
+					XDrawPoint(display, window, gc, render_posX + x, y);
+				}
+			}
+		}
 	}
 }
 
