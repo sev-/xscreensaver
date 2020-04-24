@@ -1,31 +1,18 @@
 /* -*- Mode: C; tab-width: 4 -*- */
-/* confetti --- a fading plot of sine squared */
+/* confetti --- falling confetti */
 
-#if 0
-static const char sccsid[] = "@(#)confetti.c	5.00 2000/11/01 xlockmore";
-#endif
-
-/*-
- * Some easy plotting stuff, by Bas van Gaalen, Holland, PD
+/* energystream, Copyright (c) 2020 Eugene Sandulenko <sev@scummvm.org>
  *
- * Copyright (c) 1996 by Charles Vidal
+ * Permission to use, copy, modify, distribute, and sell this software and its
+ * documentation for any purpose is hereby granted without fee, provided that
+ * the above copyright notice appear in all copies and that both that
+ * copyright notice and this permission notice appear in supporting
+ * documentation.  No representations are made about the suitability of this
+ * software for any purpose.  It is provided "as is" without express or
+ * implied warranty.
  *
- * Permission to use, copy, modify, and distribute this software and its
- * documentation for any purpose and without fee is hereby granted,
- * provided that the above copyright notice appear in all copies and that
- * both that copyright notice and this permission notice appear in
- * supporting documentation.
- *
- * This file is provided AS IS with no warranties of any kind.  The author
- * shall have no liability with respect to the infringement of copyrights,
- * trade secrets or any patents by this file or any part thereof.  In no
- * event will the author be liable for any lost revenue or profits or
- * other special, indirect and consequential damages.
- *
- * Revision History:
- * 01-Nov-2000: Allocation checks
- * 10-May-1997: Compatible with screensaver
- * 1996: Written by Charles Vidal based on work by Bas van Gaalen
+ * Based on code by Thomas Mattel, used with permission from the author
+ * Parallel Multiverse demo (https://github.com/Moon70/ParallelMultiverse)
  */
 
 #ifdef STANDALONE
